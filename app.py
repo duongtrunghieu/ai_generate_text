@@ -79,7 +79,6 @@ def is_image_almost_white(image, white_threshold=245):
 def recognize_text():
     t1 = int(time.time() * 10)
     data = request.get_json()
-    print(data)
     image_base64 = data['image']
     image_data = base64.b64decode(image_base64.split(',')[1])
     image = Image.open(BytesIO(image_data))
@@ -87,6 +86,7 @@ def recognize_text():
         return ''
     gray_image = image
     config = Cfg.load_config_from_name('vgg_seq2seq')
+    config['weights'] = 'model/vgg_seq2seq.pth'
     config['device'] = 'cpu'
     detector = Predictor(config)
     try:
