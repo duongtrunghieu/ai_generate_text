@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>Nhận diện </title>
+    <style>
+        #rectangleCanvas {
+            position: absolute;
+            top: 50px;
+            left: 0;
+        }
+        #text-field-container {
+            display: flex;
+            justify-content: left;
+            align-items: left;
+            padding: 10px; /* Phần padding cho thêm không gian xung quanh trường văn bản */
+            background-color: #f1f1f1; /* Màu nền cho container của trường văn bản */
+            border-bottom: 1px solid #e1e1e1; /* Tạo một đường phân cách */
+        }
+
+    </style>
+</head>
+<body>
+<div id="text-field-container">
+    <label for="drawing-code">Mã bản vẽ: </label>
+    <input type="text" id="drawing-code" placeholder="Nhập mã bản vẽ ở đây">
+</div>
+{% for image in images %}
+<div>
+    <img id="pdf-image" src="data:image/jpeg;base64,{{ image }}" alt="Ảnh từ PDF" onclick="handleImageClick(event)">
+    <canvas id="rectangleCanvas"></canvas>
+</div>
+<div>
+    <button onclick="rotateImage(90)">Xoay ảnh</button>
+</div>
+{% endfor %}
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    window.onload = function () {
+      var canvas = document.getElementById('rectangleCanvas');
+      var ctx = canvas.getContext('2d');
+      var isDrawing = false;
+      var startX, startY;
+
+      var img = document.getElementById('pdf-image');
+
+      img.onload = function() {
+          var displayWidth = window.innerWidth;
+          var displayHeight = window.innerHeight;
+
+          var aspectRatio = img.width / img.height;
+
+          var scaledWidth = displayWidth;
+          var scaledHeight = scaledWidth / aspectRatio;
+
+          img.width = scaledWidth;
+          img.height = scaledHeight;
+          canvas.width = displayWidth;
+          canvas.height = displayHeight;
+
+          ctx.drawImage(img, 0, 0, scaledWidth, scaledHeight);
+      };
+
+      if (img.complete) {
+          img.onload();
+      }
+
+      function getCursorPosition(canvas, event) {
+          const rect = canvas.getBoundingClientRect();
+          return {
+              x: event.clientX - rect.left,
+              y: event.clientY - rect.top,
+          };
+      }
+
+      function startDrawing(event) {
+          isDrawing = true;
+          const position = getCursorPosition(canvas, event);
+          startX = position.x;
+          startY = position.y;
+      }
+
+      function drawRectangle(event) {
+          if (!isDrawing) return;
+          const position = getCursorPosition(canvas, event);
+          ctx.clearRect(0, 0, canvas.width, canvas.height); // Xóa canvas cũ để vẽ hình mới
+          ctx.drawImage(img, 0, 0, img.width, img.height);
+          var width = position.x - startX;
+          var height = position.y - startY;
+          ctx.strokeStyle = 'red';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(startX, startY, width, height);
+      }
+
+      function endDrawing(event) {
+          isDrawing = false;
+          const position = getCursorPosition(canvas, event);
+          var width = position.x - startX;
+          var height = position.y - startY;
+          sendRectangleInfo(startX, startY, width, height);
+      }
+      canvas.addEventListener('mousedown', startDrawing);
+      canvas.addEventListener('mousemove', drawRectangle);
+      canvas.addEventListener('mouseup', endDrawing);
+
+  function sendRectangleInfo(x, y, width, height) {
+    var img = new Image();
+    var currentImageSrc = document.getElementById('pdf-image').src.split(",")[1];
+    var canvas = document.getElementById('rectangleCanvas');
+    var ctx = canvas.getContext('2d');
+
+    var rectangleImageData = ctx.getImageData(x, y, width, height);
+
+    var croppedCanvas = document.createElement('canvas');
+    croppedCanvas.width = width;
+    croppedCanvas.height = height;
+    var croppedCtx = croppedCanvas.getContext('2d');
+
+    croppedCtx.putImageData(rectangleImageData, 0, 0);
+
+    var base64ImageData = croppedCanvas.toDataURL('image/jpeg');
+    console.log(base64ImageData)
+    $.ajax({
+      url: '/recognize_text',
+      type: 'POST',
+      contentType: 'application/json',
+      data: JSON.stringify ({
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        image: base64ImageData
+      }),
+      success: function(response) {
+            var drawingCodeInput = document.getElementById('drawing-code');
+            if(drawingCodeInput) {
+                drawingCodeInput.value = response; // Đặt văn bản trả về vào trường input
+            } else {
+                console.error('Không tìm thấy trường nhập mã bản vẽ.');
+            }
+      },
+      error: function(xhr, status, error) {
+        console.error('Lỗi:', error);
+      }
+});
+}
+}
+
+  function rotateImage(degrees) {
+  var imgElement = document.getElementById('pdf-image');
+  var currentImageSrc = imgElement.src.split(",")[1];
+
+  fetch(`/rotate/${degrees}`, {
+      method: 'POST',
+      headers: {
+          'Content-Type': 'application/octet-stream'
+      },
+      body: currentImageSrc
+  })
+  .then(response => {
+      if (!response.ok) {
+          throw new Error('Có lỗi xảy ra khi xoay ảnh.');
+      }
+      return response.text();
+  })
+  .then(rotatedImageData => {
+      imgElement.onload = function() {
+          var canvas = document.getElementById('rectangleCanvas');
+          var ctx = canvas.getContext('2d');
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          imgElement.width = window.innerWidth;
+          imgElement.height = window.innerHeight;
+          ctx.drawImage(imgElement, 0, 0, window.innerWidth, window.innerHeight);
+      };
+      imgElement.src = 'data:image/jpeg;base64,' + rotatedImageData;
+  })
+  .catch(error => {
+      console.error('Lỗi:', error);
+  });
+}
+</script>
+
+</body>
+</html>
