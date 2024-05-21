@@ -1,6 +1,6 @@
 import time
 
-from flask import Flask, render_template, request, redirect
+from flask import Flask, render_template, request, redirect, jsonify
 from pdf2image import convert_from_path
 import os
 import base64
@@ -92,10 +92,15 @@ def recognize_text():
     try:
         s = detector.predict(gray_image)
         recognized_text = s
+        return jsonify({
+            "status_code": 200,  # OK
+            "data": recognized_text
+        })
     except Exception as e:
-        recognized_text = "Lỗi xảy ra khi nhận diện văn bản: " + str(e)
-    t2 = int(time.time() * 10)
-    return recognized_text
+        return jsonify({
+            "status_code": 500,  # Internal Server Error
+            "data": str(e)
+        })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
