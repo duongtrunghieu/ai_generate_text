@@ -3,7 +3,6 @@ import time
 from flask import Flask, render_template, request, redirect, jsonify
 from pdf2image import convert_from_path
 import os
-import base64
 from io import BytesIO
 from PIL import Image
 from vietocr.tool.predictor import Predictor
@@ -11,12 +10,15 @@ from vietocr.tool.config import Cfg
 import numpy as np
 import base64
 from flask_cors import CORS
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
 UPLOAD_FOLDER = 'uploads'
 ALLOWED_EXTENSIONS = {'pdf'}
-
+config = None
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 def allowed_file(filename):
@@ -26,7 +28,7 @@ def allowed_file(filename):
 def upload_form():
     return render_template('upload_form.html')
 
-@app.route('/', methods=['POST'])
+@app.route('/upload_file', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return redirect(request.url)
@@ -50,7 +52,6 @@ def upload_file():
 
         first_img = images[0]
         width, height = first_img.size
-
         return render_template('display_images.html', images=base64_images, width=width, height=height)
     else:
         return redirect(request.url)
@@ -77,21 +78,24 @@ def is_image_almost_white(image, white_threshold=245):
 
 @app.route('/recognize_text', methods=['POST'])
 def recognize_text():
-    t1 = int(time.time() * 10)
+    global conifg
     data = request.get_json()
     image_base64 = data['image']
     image_data = base64.b64decode(image_base64.split(',')[1])
     image = Image.open(BytesIO(image_data))
     if is_image_almost_white(image):
-        return ''
+        return jsonify({
+            "status_code": 204,  # No Content
+            "data": " "
+        })
     gray_image = image
-    config = Cfg.load_config_from_name('vgg_seq2seq')
-    config['weights'] = 'model/vgg_seq2seq.pth'
-    config['device'] = 'cpu'
+    t1 = int(time.time() * 10)
     detector = Predictor(config)
     try:
         s = detector.predict(gray_image)
         recognized_text = s
+        t2 = int(time.time() * 10)
+        logging.info("time check: %d, recognized text: %s", (t2-t1), s)
         return jsonify({
             "status_code": 200,  # OK
             "data": recognized_text
@@ -103,4 +107,11 @@ def recognize_text():
         })
 
 if __name__ == '__main__':
+    try:
+        config = Cfg.load_config_from_name('vgg_seq2seq')
+        config['weights'] = 'model/vgg_seq2seq.pth'
+        config['device'] = 'cpu'
+    except Exception as ex:
+        logging.exception(ex)
+        g_cams = None
     app.run(host='0.0.0.0')
