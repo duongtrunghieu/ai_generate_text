@@ -1,5 +1,4 @@
 import time
-
 from flask import Flask, render_template, request, redirect, jsonify
 from pdf2image import convert_from_path
 import os
@@ -11,8 +10,10 @@ import numpy as np
 import base64
 from flask_cors import CORS
 import logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
 CORS(app)
 
@@ -71,11 +72,6 @@ def rotate_image(degrees):
 
     return rotated_base64_image
 
-def is_image_almost_white(image, white_threshold=245):
-    np_image = np.array(image)
-    avg_pixel_value = np_image.mean()
-    return avg_pixel_value >= white_threshold
-
 @app.route('/recognize_text', methods=['POST'])
 def recognize_text():
     global conifg
@@ -83,26 +79,27 @@ def recognize_text():
     image_base64 = data['image']
     image_data = base64.b64decode(image_base64.split(',')[1])
     image = Image.open(BytesIO(image_data))
-    if is_image_almost_white(image):
-        return jsonify({
-            "status_code": 204,  # No Content
-            "data": " "
-        })
     gray_image = image
     t1 = int(time.time() * 10)
     detector = Predictor(config)
     try:
-        s = detector.predict(gray_image)
+        s, prob = detector.predict(gray_image, return_prob=True)
         recognized_text = s
         t2 = int(time.time() * 10)
         logging.info("time check: %d, recognized text: %s", (t2-t1), s)
-        return jsonify({
-            "status_code": 200,  # OK
-            "data": recognized_text
-        })
+        if prob >= 0.5:
+            return jsonify({
+                "status_code": 200,
+                "data": recognized_text
+            })
+        else:
+            return jsonify({
+                "status_code": 204,
+                "data": " "
+            })
     except Exception as e:
         return jsonify({
-            "status_code": 500,  # Internal Server Error
+            "status_code": 500,
             "data": str(e)
         })
 

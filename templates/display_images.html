@@ -13,9 +13,9 @@
             display: flex;
             justify-content: left;
             align-items: left;
-            padding: 10px; /* Phần padding cho thêm không gian xung quanh trường văn bản */
-            background-color: #f1f1f1; /* Màu nền cho container của trường văn bản */
-            border-bottom: 1px solid #e1e1e1; /* Tạo một đường phân cách */
+            padding: 10px;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid #e1e1e1;
         }
 
     </style>
@@ -134,13 +134,17 @@
         image: base64ImageData
       }),
       success: function(response) {
-            var drawingCodeInput = document.getElementById('drawing-code');
-            if(drawingCodeInput) {
-                drawingCodeInput.value = response; // Đặt văn bản trả về vào trường input
+            if(response.status_code === 200) {
+                var drawingCodeInput = document.getElementById('drawing-code');
+                if(drawingCodeInput) {
+                    drawingCodeInput.value = response.data; 
+                } else {
+                    console.error('Không tìm thấy trường nhập mã bản vẽ.');
+                }
             } else {
-                console.error('Không tìm thấy trường nhập mã bản vẽ.');
+                console.error('Lỗi từ máy chủ:', response.data);
             }
-      },
+        },
       error: function(xhr, status, error) {
         console.error('Lỗi:', error);
       }
