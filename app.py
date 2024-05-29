@@ -30,6 +30,34 @@ def upload_form():
     return render_template('upload_form.html')
 
 @app.route('/upload_file', methods=['POST'])
+def upload_file_v2():
+    if 'file' not in request.files:
+        return redirect(request.url)
+    file = request.files['file']
+    if file.filename == '':
+        return redirect(request.url)
+    if file and allowed_file(file.filename):
+        pdf_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+        file.save(pdf_path)
+        images = convert_from_path(pdf_path)
+
+        base64_images = []
+        for idx, image in enumerate(images):
+            image_path = os.path.join(app.config['UPLOAD_FOLDER'], f'converted_image_{idx}.jpg')
+            image.save(image_path)
+
+            img_buffer = BytesIO()
+            image.save(img_buffer, format='JPEG')
+            img_str = base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+            base64_images.append(img_str)
+
+        first_img = images[0]
+        width, height = first_img.size
+
+        return jsonify(base64_images=base64_images)
+    else:
+        return redirect(request.url)
+@app.route('/upload_file_v2', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
         return redirect(request.url)
@@ -58,7 +86,7 @@ def upload_file():
         return redirect(request.url)
 
 
-@app.route('/rotate/<int:degrees>', methods=['POST'])
+@app.route('/rotate_v2/<int:degrees>', methods=['POST'])
 def rotate_image(degrees):
     base64_image_data = request.data.decode('utf-8')
 
@@ -71,7 +99,37 @@ def rotate_image(degrees):
     rotated_base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
 
     return rotated_base64_image
+@app.route('/rotate/<int:degrees>', methods=['POST'])
+def rotate_image_v2(degrees):
+    try:
+        # Parse JSON data from request
+        data = request.get_json()
+        if not data or 'image' not in data:
+            raise ValueError("Invalid input data")
 
+        base64_image_data = data['image']
+        img_data = base64.b64decode(base64_image_data)
+        img = Image.open(BytesIO(img_data))
+
+        # Rotate the image
+        rotated_img = img.rotate(degrees, expand=True)
+
+        # Convert the rotated image to base64
+        buffered = BytesIO()
+        rotated_img.save(buffered, format="JPEG")
+        rotated_base64_image = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+        return jsonify({
+            "status_code": 200,  # OK
+            "data": rotated_base64_image
+        })
+    except Exception as e:
+        # Log the exception
+        app.logger.error(f"Error processing request: {e}")
+        return jsonify({
+            "status_code": 500,
+            "error": str(e)
+        }), 500
 @app.route('/recognize_text', methods=['POST'])
 def recognize_text():
     global conifg
