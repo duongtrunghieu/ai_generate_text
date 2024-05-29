@@ -137,7 +137,7 @@
             if(response.status_code === 200) {
                 var drawingCodeInput = document.getElementById('drawing-code');
                 if(drawingCodeInput) {
-                    drawingCodeInput.value = response.data; 
+                    drawingCodeInput.value = response.data;
                 } else {
                     console.error('Không tìm thấy trường nhập mã bản vẽ.');
                 }
@@ -156,7 +156,7 @@
   var imgElement = document.getElementById('pdf-image');
   var currentImageSrc = imgElement.src.split(",")[1];
 
-  fetch(`/rotate/${degrees}`, {
+  fetch(`/rotate_v2/${degrees}`, {
       method: 'POST',
       headers: {
           'Content-Type': 'application/octet-stream'
