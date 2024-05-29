@@ -81,7 +81,6 @@ def recognize_text():
     image = Image.open(BytesIO(image_data))
     gray_image = image
     t1 = int(time.time() * 10)
-    detector = Predictor(config)
     try:
         s, prob = detector.predict(gray_image, return_prob=True)
         recognized_text = s
@@ -108,6 +107,7 @@ if __name__ == '__main__':
         config = Cfg.load_config_from_name('vgg_seq2seq')
         config['weights'] = 'model/vgg_seq2seq.pth'
         config['device'] = 'cpu'
+        detector = Predictor(config)
     except Exception as ex:
         logging.exception(ex)
         g_cams = None
