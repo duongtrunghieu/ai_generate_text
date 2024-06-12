@@ -1,3 +1,4 @@
+import sys
 import time
 from flask import Flask, render_template, request, redirect, jsonify
 from pdf2image import convert_from_path
@@ -6,10 +7,10 @@ from io import BytesIO
 from PIL import Image
 from vietocr.tool.predictor import Predictor
 from vietocr.tool.config import Cfg
-import numpy as np
 import base64
 from flask_cors import CORS
 import logging
+from utils.cv import decode_base64_to_image, process_image
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -130,18 +131,25 @@ def rotate_image_v2(degrees):
             "status_code": 500,
             "error": str(e)
         }), 500
+
 @app.route('/recognize_text', methods=['POST'])
 def recognize_text():
     global conifg
     data = request.get_json()
     image_base64 = data['image']
-    image_data = base64.b64decode(image_base64.split(',')[1])
-    image = Image.open(BytesIO(image_data))
-    gray_image = image
+    base64_string = image_base64.split(",")[1]
+
+    image = decode_base64_to_image(base64_string)
+
+    gray_image = process_image(image)
+
+    blank_image = Image.fromarray(gray_image)
     t1 = int(time.time() * 10)
     try:
-        s, prob = detector.predict(gray_image, return_prob=True)
+        s, prob = detector.predict(blank_image, return_prob=True)
         recognized_text = s
+        if recognized_text.startswith('0'):
+            recognized_text = recognized_text[1:]
         t2 = int(time.time() * 10)
         logging.info("time check: %d, recognized text: %s", (t2-t1), s)
         if prob >= 0.5:
